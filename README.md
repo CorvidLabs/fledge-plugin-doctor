@@ -1,58 +1,44 @@
-# fledge-plugin-doctor
+# fledge-plugin-doctor — DEPRECATED
 
-Toolchain diagnostics for [fledge](https://github.com/CorvidLabs/fledge) — extends the lean v0.15+ `fledge doctor` with checks for installed language toolchains.
+> **This plugin has been re-absorbed into core `fledge doctor`.** The toolchain probes now live in core as an informational `Toolchains` section. The repo is archived.
 
-Pre-v0.15, `fledge doctor` baked checks for rustc/cargo/node/npm/pnpm/bun/python/swift/kotlin/etc. directly into core (~250 LOC of `if-elif` over ecosystems). v0.15 stripped all of that to keep core lean. This plugin restores the toolchain probes as an opt-in add-on.
+## What changed
 
-## Install
+In fledge **v0.15.2+**, `fledge doctor` ships the toolchain probes (rustc/cargo/node/npm/pnpm/bun/yarn/python3/uv/poetry/go/ruby/swift/java/gradle/mvn) as a fourth section called `Toolchains`. The section is **informational** — missing tools render dimmed (`· tool (not installed)`) and don't pollute the pass/fail totals (a Python project shouldn't fail because Swift is absent).
+
+```
+$ fledge doctor
+
+  fledge
+    ✅ fledge config 0.15.2 — loaded
+
+  Git
+    ✅ git 2.50.1
+    ...
+
+  AI
+    ...
+
+  Toolchains
+    ✅ rustc 1.93.0
+    ✅ cargo 1.93.0
+    ✅ node 25.5.0
+    · pnpm (not installed)
+    ✅ bun 1.3.12
+    ...
+```
+
+If you previously installed this plugin via `fledge plugins install --defaults`, you can remove it:
 
 ```sh
-fledge plugins install CorvidLabs/fledge-plugin-doctor
+fledge plugins remove fledge-plugin-doctor
 ```
 
-## Commands
+## Why archive?
 
-### `fledge doctor-tools [--json]`
+This plugin was 110 lines of shell parallel to core `fledge doctor`. It registered as the sibling command `doctor-tools` with a description claiming to "extend `fledge doctor`" — but it didn't extend anything; it was a separate command. Re-absorbing back into core gives you one diagnostic surface with one section per concern.
 
-Probes installed toolchains and reports versions.
-
-```
-$ fledge doctor-tools
-
-  rust
-    ✅ rustc                1.84.0
-    ✅ cargo                1.84.0
-    ✅ cargo-clippy         1.84.0
-
-  node
-    ✅ node                 22.13.0
-    ✅ npm                  10.9.2
-    ❌ pnpm                 not found
-    ✅ bun                  1.1.45
-    ❌ yarn                 not found
-
-  python
-    ✅ python3              3.13.1
-    ✅ uv                   0.5.16
-    ❌ poetry               not found
-
-  go
-    ❌ go                   not found
-
-  swift
-    ✅ swift                6.0.3
-  ...
-```
-
-`--json` emits an array of `{tool, group, status, version}` entries.
-
-## Probed groups
-
-`rust` (rustc, cargo, cargo-clippy), `node` (node, npm, pnpm, bun, yarn), `python` (python3, uv, poetry), `go`, `ruby`, `swift`, `java` (java, gradle, mvn).
-
-## Why a plugin?
-
-Probing every toolchain in the binary every fledge user installs is dead weight for almost everyone. A Rust-only shop carries the npm/pip/swift code for nothing. As a plugin, this is opt-in and trivially extendable — to add a new toolchain, add one entry to the `PROBES` array in `bin/fledge-doctor-tools`.
+See [`CorvidLabs/fledge`](https://github.com/CorvidLabs/fledge) — `fledge doctor --help`.
 
 ## License
 
