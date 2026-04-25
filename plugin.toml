@@ -1,0 +1,11 @@
+[plugin]
+name = "fledge-plugin-doctor"
+version = "0.1.0"
+description = "Toolchain diagnostics for fledge — extends `fledge doctor` with rust/node/python/swift probes"
+author = "0xLeif"
+license = "MIT"
+
+[[commands]]
+name = "doctor-tools"
+description = "Probe installed dev toolchains (rust, node, python, swift, go, bun, ...)"
+binary = "bin/fledge-doctor-tools"

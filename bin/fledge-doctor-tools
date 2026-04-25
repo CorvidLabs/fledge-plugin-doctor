@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# fledge-doctor-tools — probe installed developer toolchains.
+# Replaces the pre-v0.15 in-core toolchain section of `fledge doctor`.
+#
+# Doesn't try to be exhaustive — checks the common ones. Add or remove tools
+# in the TOOLS array below.
+set -euo pipefail
+
+JSON=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json)    JSON=true; shift;;
+    -h|--help)
+      cat <<'EOF'
+fledge doctor-tools — probe installed developer toolchains
+
+USAGE:
+  fledge doctor-tools [--json]
+
+Reports which language toolchains are installed and their version.
+Probes (in order):
+  rust:    rustc, cargo, clippy
+  node:    node, npm, pnpm, bun, yarn
+  python:  python3, uv, poetry
+  go:      go
+  ruby:    ruby
+  swift:   swift
+  java:    java, gradle, mvn
+EOF
+      exit 0
+      ;;
+    *) echo "fledge-doctor-tools: unknown argument '$1'" >&2; exit 64;;
+  esac
+done
+
+# Tool list: name, version-args, group
+PROBES=(
+  "rustc|--version|rust"
+  "cargo|--version|rust"
+  "cargo-clippy|--version|rust"
+  "node|--version|node"
+  "npm|--version|node"
+  "pnpm|--version|node"
+  "bun|--version|node"
+  "yarn|--version|node"
+  "python3|--version|python"
+  "uv|--version|python"
+  "poetry|--version|python"
+  "go|version|go"
+  "ruby|--version|ruby"
+  "swift|--version|swift"
+  "java|-version|java"
+  "gradle|--version|java"
+  "mvn|--version|java"
+)
+
+extract_version() {
+  # Extract the first dotted version-looking token from the input.
+  awk '{
+    for (i=1; i<=NF; i++) {
+      t = $i
+      sub(/^v/, "", t)
+      sub(/^go/, "", t)
+      gsub(/[",]/, "", t)
+      if (t ~ /^[0-9]+\.[0-9]+/) { print t; exit }
+    }
+  }' <<< "$1"
+}
+
+probe_one() {
+  local cmd="$1" args="$2"
+  local out
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "MISSING|"
+    return
+  fi
+  # version output sometimes goes to stderr (java)
+  out="$("$cmd" $args 2>&1 | head -3 || true)"
+  local ver
+  ver="$(extract_version "$out")"
+  printf 'OK|%s' "$ver"
+}
+
+if [ "$JSON" = "true" ]; then
+  printf '['
+  FIRST=true
+  for entry in "${PROBES[@]}"; do
+    IFS='|' read -r name args group <<< "$entry"
+    res="$(probe_one "$name" "$args")"
+    status="${res%%|*}"
+    ver="${res#*|}"
+    [ "$FIRST" = "true" ] || printf ','
+    FIRST=false
+    if [ "$status" = "OK" ]; then
+      printf '\n  {"tool": "%s", "group": "%s", "status": "ok", "version": "%s"}' "$name" "$group" "$ver"
+    else
+      printf '\n  {"tool": "%s", "group": "%s", "status": "missing", "version": null}' "$name" "$group"
+    fi
+  done
+  printf '\n]\n'
+else
+  CURRENT_GROUP=""
+  for entry in "${PROBES[@]}"; do
+    IFS='|' read -r name args group <<< "$entry"
+    if [ "$group" != "$CURRENT_GROUP" ]; then
+      [ -n "$CURRENT_GROUP" ] && echo
+      echo "  $group"
+      CURRENT_GROUP="$group"
+    fi
+    res="$(probe_one "$name" "$args")"
+    status="${res%%|*}"
+    ver="${res#*|}"
+    if [ "$status" = "OK" ]; then
+      printf '    ✅ %-20s %s\n' "$name" "${ver:-(installed)}"
+    else
+      printf '    ❌ %-20s %s\n' "$name" "not found"
+    fi
+  done
+  echo
+fi
